@@ -1,48 +1,18 @@
 import os
 import streamlit as st
+from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
+from crewai import Agent, Task, Crew
+from typing import Dict, List, Optional
+import json
 
-# Set page config first (must be the first Streamlit command after import)
+# Set page config first (must be the first Streamlit command)
 st.set_page_config(
     page_title="AI Research Assistant",
     page_icon="🔍",
     layout="wide"
 )
-
-from datetime import datetime
-from pathlib import Path
-from dotenv import load_dotenv
-from crewai import Agent, Task, Crew
-from typing import Dict, List, Optional, Any
-import json
-import time
-from streamlit_chat import message as st_message
-
-# Custom CSS for chat interface
-st.markdown("""
-<style>
-.chat-message {
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-    display: flex;
-    max-width: 80%;
-    word-wrap: break-word;
-}
-.chat-message.user {
-    background-color: #2b313e;
-    margin-left: auto;
-    border-bottom-right-radius: 0;
-}
-.chat-message.assistant {
-    background-color: #4a4a4a;
-    margin-right: auto;
-    border-bottom-left-radius: 0;
-}
-.stButton>button {
-    width: 100%;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # Load environment variables
 load_dotenv()
@@ -185,89 +155,45 @@ class ResearchCrew:
             'output_file': f'output/{self.topic.lower().replace(" ", "_")}_{self.timestamp}.md'
         }
 
-def initialize_session_state():
-    """Initialize session state variables"""
-    if 'messages' not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I'm your AI research assistant. What would you like to learn about today?"}
-        ]
-    if 'research_in_progress' not in st.session_state:
-        st.session_state.research_in_progress = False
-    if 'research_result' not in st.session_state:
-        st.session_state.research_result = None
-
-def display_chat():
-    """Display chat messages"""
-    st.title("🔍 AI Research Assistant")
-    
-    # Display chat messages
-    for idx, msg in enumerate(st.session_state.messages):
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-def process_research(topic: str):
-    """Process research request"""
-    try:
-        with st.spinner(f"🔍 Researching {topic}... This may take a few moments."):
-            crew = ResearchCrew(topic)
-            result = crew.run()
-            
-            st.session_state.research_result = result
-            
-            # Read and return the research result
-            with open(result['output_file'], 'r') as f:
-                return f"# Research Complete: {topic}\n\n{f.read()}"
-    except Exception as e:
-        return f"❌ An error occurred during research: {str(e)}"
-
 def main():
     """Main function to run the enhanced Crew AI application"""
-    initialize_session_state()
+    st.title("🔍 AI Research Assistant")
+    st.write("Enter a topic to research and get detailed, fact-checked information.")
     
-    # Display chat messages
-    display_chat()
-    
-    # Chat input
-    if prompt := st.chat_input("Type your research topic or question..."):
-        # Add user message to chat
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        # Process the research
-        response = process_research(prompt)
-        
-        # Add assistant response to chat
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        # Rerun to update the chat display
-        st.rerun()
-    
-    # Display research result if available
-    if st.session_state.get('research_result'):
-        with st.sidebar:
-            st.header("Research Results")
-            with open(st.session_state.research_result['output_file'], 'r') as f:
-                content = f.read()
-                st.download_button(
-                    label="📥 Download Report",
-                    data=content,
-                    file_name=f"{st.session_state.research_result['topic'].lower().replace(' ', '_')}_report.md",
-                    mime="text/markdown"
-                )
-    
-    # Add some helpful examples in the sidebar
     with st.sidebar:
-        st.header("💡 Try these examples")
-        examples = [
-            "Tell me about quantum computing",
-            "What are the latest advancements in AI?",
-            "Explain how blockchain works"
-        ]
-        for example in examples:
-            if st.button(example, key=f"example_{example}"):
-                st.session_state.messages.append({"role": "user", "content": example})
-                response = process_research(example)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.rerun()
+        st.header("Research Settings")
+        topic = st.text_input("Enter a research topic:", "The Moon")
+        
+        if st.button("Start Research"):
+            with st.spinner(f"Researching {topic}..."):
+                try:
+                    crew = ResearchCrew(topic)
+                    result = crew.run()
+                    
+                    st.session_state.research_result = result
+                    st.session_state.show_results = True
+                    
+                    st.success("Research completed successfully!")
+                    
+                    # Display the result
+                    with open(result['output_file'], 'r') as f:
+                        content = f.read()
+                        st.download_button(
+                            label="Download Report",
+                            data=content,
+                            file_name=f"{topic.lower().replace(' ', '_')}_report.md",
+                            mime="text/markdown"
+                        )
+                        
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+    
+    if st.session_state.get('show_results', False):
+        st.header(f"Research Results: {st.session_state.research_result['topic']}")
+        
+        with open(st.session_state.research_result['output_file'], 'r') as f:
+            content = f.read()
+            st.markdown(content)
 
 if __name__ == '__main__':
     if not st.session_state.get('show_results', False):
