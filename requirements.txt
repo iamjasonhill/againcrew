@@ -1,1 +1,5 @@
-crewai 
+crewai
+streamlit
+python-dotenv
+rich
+matplotlib
