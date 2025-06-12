@@ -7,6 +7,13 @@ from crewai import Agent, Task, Crew
 from typing import Dict, List, Optional
 import json
 
+# Set page config first (must be the first Streamlit command)
+st.set_page_config(
+    page_title="AI Research Assistant",
+    page_icon="🔍",
+    layout="wide"
+)
+
 # Load environment variables
 load_dotenv()
 
@@ -19,28 +26,27 @@ else:
     st.error('Please set OPENAI_API_KEY in Streamlit secrets or environment variables')
     st.stop()
 
-# Configure ChromaDB to use in-memory storage and disable telemetry
-os.environ["CHROMA_DB_IMPL"] = "duckdb+parquet"
-os.environ["CHROMA_CACHE_DIR"] = ".chroma_cache"
-os.environ["CHROMA_ANONYMIZED_TELEMETRY"] = "False"
-
-# Try to import and configure ChromaDB
+# Configure ChromaDB with the new client API
 try:
     import chromadb
-    from chromadb.config import Settings
     
-    # Configure ChromaDB settings
-    chroma_client = chromadb.Client(Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=".chroma_db"  # This will be created if it doesn't exist
-    ))
+    # Initialize the new Chroma client
+    chroma_client = chromadb.PersistentClient(
+        path=".chroma_cache",  # Directory to store the database
+        settings=chromadb.Settings(
+            anonymized_telemetry=False  # Disable telemetry
+        )
+    )
     
-    # This helps avoid the SQLite version check
-    os.environ["CHROMA_DB_IMPL"] = "duckdb+parquet"
+    # Test the connection
+    chroma_client.heartbeat()
     
+except ImportError:
+    st.warning("ChromaDB not installed. Some features may be limited.")
+    chroma_client = None
 except Exception as e:
-    st.warning(f"ChromaDB configuration warning: {str(e)}")
-    # Continue without ChromaDB if there's an error
+    st.warning(f"Failed to initialize ChromaDB: {str(e)}. Some features may be limited.")
+    chroma_client = None
 
 class ResearchCrew:
     def __init__(self, topic: str):
@@ -151,12 +157,6 @@ class ResearchCrew:
 
 def main():
     """Main function to run the enhanced Crew AI application"""
-    st.set_page_config(
-        page_title="AI Research Assistant",
-        page_icon="🔍",
-        layout="wide"
-    )
-    
     st.title("🔍 AI Research Assistant")
     st.write("Enter a topic to research and get detailed, fact-checked information.")
     
