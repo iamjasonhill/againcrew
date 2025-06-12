@@ -10,6 +10,15 @@ import json
 # Load environment variables
 load_dotenv()
 
+# Set OpenAI API key from Streamlit secrets or environment
+if 'OPENAI_API_KEY' in st.secrets:
+    os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+elif 'OPENAI_API_KEY' in os.environ:
+    pass  # Use the environment variable if it exists
+else:
+    st.error('Please set OPENAI_API_KEY in Streamlit secrets or environment variables')
+    st.stop()
+
 class ResearchCrew:
     def __init__(self, topic: str):
         self.topic = topic
